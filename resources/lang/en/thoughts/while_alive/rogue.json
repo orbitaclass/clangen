@@ -14,17 +14,24 @@
             "Is struggling to survive on {PRONOUN/m_c/poss} own",
             "Is fighting with another rogue over food",
             "Laughs at the thought of dead cats 'watching over' c_n",
-            "Debates if {PRONOUN/m_c/subject} should join c_n"
+            "Laughs at the thought of dead cats 'watching over' o_c_n",
+            "Debates if {PRONOUN/m_c/subject} should join c_n",
+            "Debates if {PRONOUN/m_c/subject} should join o_c_n"
         ]
     },
     {
         "event_id": "rogue_to_other_rogues",
         "strings": [
-            "Showing off {PRONOUN/m_c/poss} scars to r_c"
+            "Shows off {PRONOUN/m_c/poss} scars to r_c",
+            "Hisses at r_c",
+            "Just chased r_c off {PRONOUN/m_c/poss} territory",
+            "Lost a fight against r_c",
+            "Won a fight against r_c"
         ],
         "involved_cats": {
             "m_c": {
                 "age": [
+                    "young adult",
                     "adult",
                     "senior adult",
                     "senior"
@@ -106,7 +113,9 @@
             "Is hoping {PRONOUN/m_c/subject} can find something to fill {PRONOUN/m_c/poss} belly tonight",
             "Licks at an old, aching scar in an attempt to soothe it",
             "Was almost found by a c_n patrol",
+            "Was almost found by a o_c_n patrol",
             "Is lurking in c_n territory",
+            "Is lurking in o_c_n territory",
             "Scents for prey"
         ],
         "involved_cats": {
@@ -208,15 +217,80 @@
         }
     },
     {
-        "event_id": "vengeful_rogue",
+        "event_id": "ambitious_rogue",
         "strings": [
-            "Wants vengeance on {PRONOUN/m_c/poss} past Clan"
+            "Considers leading an invasion on c_n",
+            "Considers leading an invasion on o_c_n",
+            "Wants to rule over {PRONOUN/m_c/poss} own territory"
         ],
         "involved_cats": {
             "m_c": {
                 "stat": {
                     "trait": [
-                        "vengeful"
+                        "ambitious"
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "event_id": "cunning_rogue",
+        "strings": [
+            "Manipulates the other rogues into doing {PRONOUN/m_c/poss} bidding",
+            "Observes the power struggles between other rogues"
+        ],
+        "involved_cats": {
+            "m_c": {
+                "stat": {
+                    "trait": [
+                        "cunning"
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "event_id": "faithful_rogue",
+        "strings":[
+            "Believes in an afterlife, even if other rogues don't",
+            "Knows {PRONOUN/m_c/subject} is being watched over by {PRONOUN/m_c/poss} ancestors"
+        ],
+        "involved_cats": {
+            "m_c": {
+                "stat": {
+                    "trait": [
+                        "faithful"
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "event_id": "compassionate_rogue",
+        "strings": [
+            "Shares {PRONOUN/m_c/poss} catch with another rogue",
+            "Defends a wounded cat from other rogues"
+        ],
+        "involved_cats": {
+            "m_c": {
+                "stat": {
+                    "trait": [
+                        "compassionate"
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "event_id": "careful_rogue",
+        "strings": [
+            "Tries to avoid fights with other rogues"
+        ],
+        "involved_cats": {
+            "m_c": {
+                "stat": {
+                    "trait": [
+                        "careful"
                     ]
                 }
             }
