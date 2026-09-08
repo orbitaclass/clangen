@@ -4,30 +4,32 @@ import logging
 import random
 import statistics
 from os.path import exists as path_exists
-from random import choice, randint, choices
+from random import choice, randint, choices, sample
 from typing import List, Tuple, Optional, Union, Literal, TypedDict
 
 import pygame
 
 from scripts.cat.cats import Cat
-from scripts.cat_relations.enums import RelType
 from scripts.cat.enums import CatAge, CatRank, CatCompatibility
+from scripts.cat_relations.enums import RelType
 from scripts.clan import get_temper_alignment
+from scripts.clan_resources.point_of_interest import get_poi_from_constraints
 from scripts.config import get_config
 from scripts.events_module.consequences import gather_cat_objects
 from scripts.events_module.event_filters import (
     check_relationship_value,
     get_personality_compatibility,
     event_for_poi,
-    check_rel_constraint_groups,
 )
-from scripts.events_module.patrol.create_new_cat import updated_create_new_cat
 from scripts.events_module.patrol.enums import PatrolChoice
 from scripts.events_module.patrol.generate_patrol_list import (
     get_patrol_list,
     will_allow_outsider_patrols,
 )
 from scripts.events_module.patrol.patrol_event import PatrolEvent
+from scripts.events_module.text_adjust import (
+    event_text_adjust,
+)
 from scripts.events_module.text_pool_event import handle_consequences
 from scripts.events_module.text_pool_event.check_general_constraints import (
     passes_general_constraints,
@@ -35,14 +37,9 @@ from scripts.events_module.text_pool_event.check_general_constraints import (
 from scripts.events_module.text_pool_event.event_retrieval import get_valid_event
 from scripts.events_module.text_pool_event.find_involved_cats import find_cats
 from scripts.events_module.text_pool_event.text_pool_event import TextPoolEvent
-from scripts.game_structure import constants
-from scripts.game_structure.game.settings import game_setting_get
 from scripts.game_structure import game
-from scripts.events_module.text_adjust import (
-    event_text_adjust,
-)
+from scripts.game_structure.game.settings import game_setting_get
 from scripts.special_dates import SpecialDate, is_today
-
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +94,7 @@ class Patrol:
         self.outcome_cats: TypedDict(
             "outcome_cats", {"success": dict[str, Cat], "failure": dict[str, Cat]}
         ) = {"success": {}, "failure": {}}
+        self.chosen_poi = None
 
     def begin_patrol(self, patrol_cats: List[Cat], patrol_type: str) -> str:
         """
@@ -123,7 +121,15 @@ class Patrol:
             self.other_clan = None
 
         # Find valid patrol
-        self.patrol_event = self._get_possible_patrol(patrol_type)
+        self._load_patrols_and_set_patrol(patrol_type)
+        self._create_needed_cats()
+
+        if self.patrol_event.poi:
+            self.chosen_poi = get_poi_from_constraints(
+                self.patrol_event.poi.get("name"),
+                self.patrol_event.poi.get("tags"),
+                self.patrol_event.poi.get("category"),
+            )
 
         # Return text adjusted patrol intro
         return event_text_adjust(
@@ -132,6 +138,7 @@ class Patrol:
             involved_cat_dict=self.involved_cats,
             clan=game.clan,
             other_clan=self.other_clan,
+            chosen_poi=self.chosen_poi,
         )
 
     def proceed_patrol(
@@ -151,6 +158,7 @@ class Patrol:
                         involved_cat_dict=self.involved_cats,
                         clan=game.clan,
                         other_clan=self.other_clan,
+                        chosen_poi=self.chosen_poi,
                     ),
                     "",
                     [],
@@ -161,11 +169,21 @@ class Patrol:
 
         return self.determine_outcome(antagonize=(path == PatrolChoice.ANTAGONIZE))
 
+    def _create_needed_cats(self):
+        """
+        Creates needed cats for the patrol start.  In its own function for unit testing purposes.
+        """
+        handle_consequences.create_needed_cats(
+            self.patrol_event, self.involved_cats, self.other_clan
+        )
+
     def _add_patrol_cats(self, patrol_cats: List[Cat]) -> None:
         """
         Sorts and categorizes patrol cats, then determines a patrol leader.
         :param patrol_cats: list of cats which are on the patrol
         """
+        self.involved_cats.clear()
+
         # ADD TO PATROL_CATS
 
         self.patrol_cats = patrol_cats
@@ -236,14 +254,14 @@ class Patrol:
         self.involved_cats["patrol_cats"] = patrol_cats
         # some_patrol will be a random assortment of the patrol cats, but not 1 nor all
         if len(patrol_cats) >= 3:
-            self.involved_cats["some_patrol"] = choices(
+            self.involved_cats["some_patrol"] = sample(
                 patrol_cats,
                 k=randint(min(2, len(patrol_cats)), min(5, len(patrol_cats) - 1)),
             )
 
         print("Patrol Leader:", str(self.involved_cats["p_l"].name))
 
-    def _get_possible_patrol(
+    def _load_patrols_and_set_patrol(
         self,
         patrol_type: str,
     ) -> PatrolEvent:
@@ -299,9 +317,9 @@ class Patrol:
             )
         # FILTER PATROLS when no debug set
         else:
-            chosen_patrol = self._filter_patrols(patrol_list, patrol_type)
+            chosen_patrol = self._filter_and_set_patrol(patrol_list, patrol_type)
 
-        return chosen_patrol
+        self.patrol_event = chosen_patrol
 
     def _decide_if_romantic(self, romantic_event: Optional[PatrolEvent]) -> bool:
         """
@@ -312,6 +330,9 @@ class Patrol:
         if not romantic_event:
             print("No romantic event")
             return False
+
+        if romantic_event == self.debug_patrol_id:
+            return True
 
         chance_of_romance_patrol = get_config(
             "patrol_generation.chance_of_romance_patrol"
@@ -359,7 +380,7 @@ class Patrol:
         print("final romance chance:", chance_of_romance_patrol)
         return not int(random.random() * chance_of_romance_patrol)
 
-    def _filter_patrols(
+    def _filter_and_set_patrol(
         self,
         possible_patrols: List[PatrolEvent],
         patrol_type: str,
@@ -394,14 +415,14 @@ class Patrol:
         chosen_patrol: Optional[PatrolEvent] = None
 
         # first we see if we can get a romantic patrol
-        if romantic_patrols and not self.debug_patrol_id:
-            chosen_patrol = self._get_valid_patrol(
+        if romantic_patrols:
+            chosen_patrol = self._set_valid_patrol(
                 romantic_patrols.copy(), find_romance=True
             )
 
         # if no romantic patrol possible, we get a normal one!
         if not chosen_patrol:
-            chosen_patrol = self._get_valid_patrol(
+            chosen_patrol = self._set_valid_patrol(
                 normal_patrols.copy(), find_romance=False
             )
             if not chosen_patrol:
@@ -419,11 +440,16 @@ class Patrol:
         """
         Patrol.used_patrols["romance" if find_romance else "normal"].clear()
 
-        return self._get_valid_patrol(possible_patrols, find_romance)
+        return self._set_valid_patrol(possible_patrols, find_romance)
 
-    def _get_valid_patrol(
+    def _set_valid_patrol(
         self, possible_patrols: List[PatrolEvent], find_romance: bool = False
     ) -> Optional[PatrolEvent]:
+        """
+        Finds a valid patrol
+        If one if found, sets the patrol event and involved cats,
+            and returns the patrol event.
+        """
         chosen_patrol = None
         patrols_to_test = [
             p
@@ -435,11 +461,7 @@ class Patrol:
             chosen_patrol, involved_cats = get_valid_event(
                 primary_cat=self.involved_cats["p_l"],
                 involved_cats=self.involved_cats,
-                interactable_cats=[
-                    c
-                    for c in self.involved_cats["patrol_cats"]
-                    if c != self.involved_cats["p_l"]
-                ],
+                interactable_cats=self.involved_cats["patrol_cats"],
                 possible_events=patrols_to_test,
                 other_clan=self.other_clan,
                 ensured_id=self.debug_patrol_id,
@@ -458,6 +480,7 @@ class Patrol:
             else:
                 # otherwise, let's set our involved cats and move on with this patrol!
                 self.involved_cats = involved_cats
+                self.patrol_event = chosen_patrol
 
         if find_romance:
             if not self._decide_if_romantic(chosen_patrol):
@@ -541,11 +564,7 @@ class Patrol:
         chosen_success, self.outcome_cats["success"] = get_valid_event(
             primary_cat=self.involved_cats["p_l"],
             involved_cats=self.involved_cats,
-            interactable_cats=[
-                c
-                for c in self.involved_cats["patrol_cats"]
-                if c != self.involved_cats["p_l"]
-            ],
+            interactable_cats=[c for c in self.involved_cats["patrol_cats"]],
             possible_events=success_outcomes,
             other_clan=self.other_clan,
             ensured_id=debug_outcome,
@@ -599,14 +618,14 @@ class Patrol:
         ]
         temp_involved_cats = self.involved_cats.copy()
 
-        temp_involved_cats = find_cats(
+        temp_involved_cats, will_create_how_many = find_cats(
             interactable_cats=temp_involved_cats["patrol_cats"],
             involved_cats=temp_involved_cats,
             outside_cats=outside_cats,
             event=outcome,
             other_clan=self.other_clan,
         )
-        if not temp_involved_cats:
+        if not (temp_involved_cats or will_create_how_many):
             return False
 
         # if we're here, then we must have found all our cats!
@@ -625,6 +644,7 @@ class Patrol:
         chosen_outcome, success = self.calculate_success(success_outcome, fail_outcome)
 
         print(f"PATROL ID: {self.patrol_event.event_id} | SUCCESS: {success}")
+        print(f"Success Outcome: {success_outcome} | Failure Outcome: {fail_outcome}")
         print(
             f"Patrol Frequency: {self.patrol_event.frequency} | Patrol Weight: {self.patrol_event.weight}"
         )
@@ -637,6 +657,7 @@ class Patrol:
             chosen_outcome,
             self.outcome_cats["success" if success else "failure"],
             self.other_clan,
+            self.chosen_poi,
         ) + (self.get_patrol_art(chosen_outcome),)
 
     def calculate_success(
