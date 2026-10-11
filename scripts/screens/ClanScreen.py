@@ -497,8 +497,7 @@ class ClanScreen(Screens):
         c = Cat.fetch_cat(button.cat_id)
 
         if not c.thought:
-            thought_type = c.next_thought_type
-            get_new_thought(c, thought_type)
+            get_new_thought(c, c.next_thought_type)
 
         tooltip_text = f"<b>{c.name}</b>\n{c.thought}"
 
