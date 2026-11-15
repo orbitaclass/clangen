@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import MISSING
 
 from scripts.models.common.condition import ConditionEnum
+from scripts.models.common.scar import Scar
 
 
 class HealthDict(BaseModel):
@@ -23,6 +24,18 @@ class HealthDict(BaseModel):
     ] = Field(
         MISSING,
         description='A list of conditions that the cat must have at least one of. if any condition is allowed, use "any"',
+    )
+    scar: Union[
+            List[
+                Union[
+                    Scar,
+                    Literal["any"],
+                ]
+            ],
+            MISSING,
+    ] = Field(
+        MISSING,
+        description='A list of scars that the cat must have at least one of. if any scar is allowed, use "any"',
     )
     must_be_congenital: Union[bool, MISSING] = Field(
         MISSING,

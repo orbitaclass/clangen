@@ -1264,6 +1264,22 @@
           "title": "Condition",
           "type": "array"
         },
+        "scar": {
+          "description": "A list of scars that the cat must have at least one of. if any scar is allowed, use \"any\"",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Scar"
+              },
+              {
+                "const": "any",
+                "type": "string"
+              }
+            ]
+          },
+          "title": "Scar",
+          "type": "array"
+        },
         "must_be_congenital": {
           "description": "By default, this is always set to false. if set to true, the cat must have been born with a permanent condition listed in the condition",
           "title": "Must Be Congenital",
