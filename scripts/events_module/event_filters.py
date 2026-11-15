@@ -1104,6 +1104,26 @@ def _check_cat_health(cat, health_constraints: dict) -> bool:
                 for cond in matching:
                     if cond.is_congenital:
                         return False
+                    
+    if health_constraints.get("scar"):
+        required_scars = health_constraints["scar"]
+        if "any" in required_scars and cat.pelt.scars:
+            return True
+        
+        is_exclusionary = _check_for_exclusionary_value(required_scars)
+        if is_exclusionary:
+            required_scars = [x.replace("-", "") for x in required_scars]
+        
+        current_scars = set(
+            [scar for scar in cat.pelt.scars]
+        )
+        
+        if current_scars.intersection(set(required_scars)):
+            if is_exclusionary:
+                return False
+        else:
+            if not is_exclusionary:
+                return False
 
     return True
 
